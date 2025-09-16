@@ -8,7 +8,7 @@
     "zan-downloader": "./index.ts"
   },
   "scripts": {
-    "start": "bun run --env-file=.env index.ts -t $ZAN_JWT_TOKEN -u $ZAN_LIVE_URL",
+    "start": "source .env && bun index.ts --token \"$ZAN_JWT_TOKEN\" --url \"$ZAN_LIVE_URL\"",
     "build": "bun build index.ts --outdir dist --target bun",
     "type-check": "tsc --noEmit"
   },

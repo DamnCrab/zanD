@@ -27,16 +27,11 @@ export interface Config {
 }
 
 export interface UserInfo {
-    id: string;
-    nickname?: string;
     userName?: string;
-    avatar?: string;
     profileImageUrl?: string;
-    level?: number;
-    badges?: string[];
 }
 
-export interface Comment {
+export interface CommentOrigin {
     id: string;
     user_id: string;
     content?: {
@@ -48,10 +43,15 @@ export interface Comment {
     created_at: string;
     admin_name?: string | null;
     admin_image?: string | null;
-    userInfo?: {
-        userName?: string;
-        profileImageUrl?: string;
-    };
+}
+
+export interface Comment extends CommentOrigin{
+    userInfo?: userInfo
+}
+
+export interface userInfo{
+    userName?: string;
+    profileImageUrl?: string;
 }
 
 export interface CommentData {
@@ -62,32 +62,6 @@ export interface CommentData {
     data: Comment;
 }
 
-export interface Resource {
-    id: string;
-    name: string;
-    url: string;
-    type: 'gift' | 'gift_animation' | 'background' | 'banner';
-}
-
-export interface LiveData {
-    live?: {
-        id: string;
-        title?: string;
-        background?: string;
-    };
-    gift?: {
-        giftList?: Array<{
-            id: string;
-            name: string;
-            image?: string;
-            animation?: string;
-        }>;
-    };
-    banner?: Array<{
-        title?: string;
-        image?: string;
-    }>;
-}
 
 export interface PageData {
     commentWsUrl?: string;
@@ -104,11 +78,7 @@ export interface EnrichedComment extends Comment {
     message?: string; // 添加message字段用于ASS生成
 }
 
-export interface DownloadResult {
-    success: boolean;
-    message: string;
-    data?: any;
-}
+
 
 export interface AssConfig {
     videoWidth: number;

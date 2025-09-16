@@ -197,9 +197,10 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
                 }
             }
             
-            // 确保输出目录存在
-            if (!fs.existsSync(outputDir)) {
-                fs.mkdirSync(outputDir, { recursive: true });
+            // 创建ASS子目录
+            const assDir = path.join(outputDir, 'ass');
+            if (!fs.existsSync(assDir)) {
+                fs.mkdirSync(assDir, { recursive: true });
             }
             
             // 生成ASS内容
@@ -208,7 +209,7 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
             // 生成文件名
             const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
             const filename = `danmaku_${timestamp}.ass`;
-            const filepath = path.join(outputDir, filename);
+            const filepath = path.join(assDir, filename);
             
             // 写入文件
             fs.writeFileSync(filepath, assContent, 'utf-8');
