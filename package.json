@@ -1,0 +1,39 @@
+{
+  "name": "zan-live-downloader",
+  "version": "1.0.0",
+  "description": "Z-aN Live评论弹幕和资源下载CLI工具",
+  "main": "index.ts",
+  "type": "module",
+  "bin": {
+    "zan-downloader": "./index.ts"
+  },
+  "scripts": {
+    "start": "bun run --env-file=.env index.ts -t $ZAN_JWT_TOKEN -u $ZAN_LIVE_URL",
+    "build": "bun build index.ts --outdir dist --target bun",
+    "type-check": "tsc --noEmit"
+  },
+  "keywords": [
+    "zan-live",
+    "downloader",
+    "comments",
+    "cli",
+    "typescript"
+  ],
+  "author": "You",
+  "license": "MIT",
+  "dependencies": {
+    "canvas": "^3.2.0",
+    "cheerio": "^1.1.2",
+    "commander": "^14.0.1",
+    "ws": "^8.18.3"
+  },
+  "engines": {
+    "bun": ">=1.0.0"
+  },
+  "devDependencies": {
+    "@types/bun": "^1.2.22",
+    "@types/node": "^24.5.0",
+    "@types/ws": "^8.18.1",
+    "typescript": "^5.9.2"
+  }
+}
