@@ -2,6 +2,7 @@ import { Comment } from './types.js';
 import fs from 'fs';
 import path from 'path';
 import { CONFIG, getDanmakuHeight, getMaxDanmakuLines } from './config.js';
+import { logger } from './utils.js';
 
 export class AssGenerator {
     private videoWidth: number;
@@ -180,6 +181,9 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
      */
     async saveAss(comments: Comment[], liveDirectoryName?: string): Promise<string> {
         try {
+            // 初始化进度条
+            logger.progressBar('生成ASS弹幕文件', 0, 100);
+            
             // 确定输出目录
             let outputDir: string;
             if (liveDirectoryName) {
@@ -194,14 +198,23 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
                 }
             }
             
+            // 更新进度：目录准备完成
+            logger.progressBar('生成ASS弹幕文件', 20, 100);
+            
             // 创建ASS目录
             const assDir = path.join(outputDir, 'ass');
             if (!fs.existsSync(assDir)) {
                 fs.mkdirSync(assDir, { recursive: true });
             }
             
+            // 更新进度：目录创建完成
+            logger.progressBar('生成ASS弹幕文件', 30, 100);
+            
             // 生成并保存ASS内容
             const assContent = await this.generateAss(comments);
+            
+            // 更新进度：ASS内容生成完成
+            logger.progressBar('生成ASS弹幕文件', 80, 100);
             
             // 使用直播名作为文件名，而不是时间戳
             let filename: string;
@@ -215,12 +228,18 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
             
             const filepath = path.join(assDir, filename);
             
+            // 更新进度：文件名准备完成
+            logger.progressBar('生成ASS弹幕文件', 90, 100);
+            
             fs.writeFileSync(filepath, assContent, 'utf-8');
             
-            console.log(`ASS字幕文件已保存: ${filepath}`);
+            // 完成进度
+            logger.progressBar('生成ASS弹幕文件', 100, 100);
+            
+            logger.info(`ASS字幕文件已保存: ${filepath}`);
             return filepath;
         } catch (error) {
-            console.error('保存ASS文件失败:', error);
+            logger.error('保存ASS文件失败:', error);
             throw error;
         }
     }

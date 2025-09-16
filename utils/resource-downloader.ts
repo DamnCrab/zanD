@@ -17,6 +17,12 @@ interface ParsedPageData {
 import { CONFIG } from './config.js';
 import { createHeaders, delay, ensureDir, logger } from './utils.js';
 
+export interface ResourceInfo {
+    url: string;
+    filename: string;
+    type: 'image' | 'video' | 'audio' | 'other';
+}
+
 export class ResourceDownloader {
     private token: string;
     private url: string;
@@ -32,7 +38,8 @@ export class ResourceDownloader {
      * 下载所有资源
      */
     async downloadAllResources(commentData: Comment[], pageData: ParsedPageData): Promise<void> {
-        logger.info('开始下载资源...');
+        logger.debug('开始下载资源...');
+        logger.progressBar('下载资源', 0, 100);
 
         // 并行下载头像和页面资源
         await Promise.all([
@@ -40,73 +47,76 @@ export class ResourceDownloader {
             this.downloadPageResources(pageData)
         ]);
 
-        logger.success('所有资源下载完成');
+        logger.progressBar('下载资源', 100, 100);
+        logger.debug('所有资源下载完成');
     }
 
     /**
-     * 从评论数据中下载用户头像
+     * 下载用户头像
      */
-    async downloadAvatars(commentData: Comment[]): Promise<void> {
-        logger.info('开始下载用户头像...');
+    async downloadAvatars(comments: Comment[]): Promise<void> {
+        const uniqueAvatars = new Map<string, string>();
+        
+        // 收集唯一的头像URL
+        for (const comment of comments) {
+            if (comment.userInfo?.profileImageUrl) {
+                const fileName = `${comment.user_id}.jpg`;
+                uniqueAvatars.set(comment.userInfo.profileImageUrl, fileName);
+            }
+        }
+
+        if (uniqueAvatars.size === 0) {
+            logger.debug('没有找到需要下载的头像');
+            return;
+        }
+
+        logger.debug(`开始下载 ${uniqueAvatars.size} 个头像...`);
 
         // 创建头像目录
         const avatarDir = join(this.outputDir, CONFIG.avatarDir);
         await ensureDir(avatarDir);
 
-        // 提取唯一的头像URL
-        const avatarUrls = new Map<string, string>();
-        commentData.forEach(comment => {
-            if (comment.userInfo?.profileImageUrl) {
-                const userId = comment.user_id;
-                const avatarUrl = comment.userInfo.profileImageUrl;
-                if (!avatarUrls.has(userId)) {
-                    avatarUrls.set(userId, avatarUrl);
-                }
+        let downloaded = 0;
+        const totalAvatars = uniqueAvatars.size;
+        for (const [url, fileName] of uniqueAvatars) {
+            try {
+                await this.downloadFile(url, avatarDir, fileName);
+                downloaded++;
+                logger.debug(`头像下载成功: ${fileName}`);
+                
+                // 更新进度 (头像下载占总进度的50%)
+                const progress = Math.round((downloaded / totalAvatars) * 50);
+                logger.progressBar('下载资源', progress, 100);
+            } catch (error) {
+                logger.error(`头像下载失败 ${fileName}:`, (error as Error).message);
+                downloaded++;
+                
+                // 即使失败也要更新进度
+                const progress = Math.round((downloaded / totalAvatars) * 50);
+                logger.progressBar('下载资源', progress, 100);
             }
-        });
-
-        if (avatarUrls.size === 0) {
-            logger.warn('未找到需要下载的头像');
-            return;
         }
 
-        logger.info(`发现 ${avatarUrls.size} 个唯一头像需要下载`);
-
-        // 批量下载头像
-        const downloadPromises = Array.from(avatarUrls.entries()).map(async ([userId, avatarUrl], index) => {
-            try {
-                // 添加延迟避免请求过于频繁
-                if (index > 0) {
-                    await delay(CONFIG.delays.resource);
-                }
-
-                logger.progress(index + 1, avatarUrls.size, `下载头像: ${userId}`);
-                await this.downloadFile(avatarUrl, avatarDir, `${userId}.jpg`);
-                return { userId, success: true };
-            } catch (error) {
-                logger.warn(`下载头像失败 ${userId}:`, (error as Error).message);
-                return { userId, success: false, error };
-            }
-        });
-
-        const results = await Promise.allSettled(downloadPromises);
-        const successCount = results.filter(result => 
-            result.status === 'fulfilled' && result.value.success
-        ).length;
-
-        logger.success(`头像下载完成: ${successCount}/${avatarUrls.size} 成功`);
+        logger.debug(`头像下载完成: ${downloaded}/${uniqueAvatars.size} 成功`);
     }
 
-    /**
-     * 从页面数据中下载图片和GIF资源
-     */
     async downloadPageResources(pageData: ParsedPageData): Promise<void> {
-        logger.info('开始下载页面资源...');
+        const resources: Array<[string, string]> = [];
+        
+        // 收集所有需要下载的资源
+        if (pageData.resourceUrls && pageData.resourceUrls.length > 0) {
+            for (const resourceUrl of pageData.resourceUrls) {
+                const fileName = this.getFileName(resourceUrl);
+                resources.push([resourceUrl, fileName]);
+            }
+        }
 
-        if (!pageData.resourceUrls || pageData.resourceUrls.length === 0) {
-            logger.warn('未找到需要下载的页面资源');
+        if (resources.length === 0) {
+            logger.debug('没有找到需要下载的页面资源');
             return;
         }
+
+        logger.debug(`开始下载 ${resources.length} 个页面资源...`);
 
         // 创建图片和GIF目录
         const imageDir = join(this.outputDir, CONFIG.imageDir);
@@ -116,40 +126,30 @@ export class ResourceDownloader {
             ensureDir(gifDir)
         ]);
 
-        logger.info(`发现 ${pageData.resourceUrls.length} 个资源需要下载`);
-
-        // 分类和下载资源
-        const downloadPromises = pageData.resourceUrls.map(async (resourceUrl: string, index: number) => {
+        let downloaded = 0;
+        const totalResources = resources.length;
+        for (const [url, fileName] of resources) {
             try {
-                // 添加延迟避免请求过于频繁
-                if (index > 0) {
-                    await delay(CONFIG.delays.resource);
-                }
-
-                logger.progress(index + 1, pageData.resourceUrls.length, `下载资源: ${this.getFileName(resourceUrl)}`);
-                
-                // 根据文件扩展名决定保存目录
-                const fileName = this.getFileName(resourceUrl);
                 const isGif = fileName.toLowerCase().endsWith('.gif');
                 const targetDir = isGif ? gifDir : imageDir;
+                await this.downloadFile(url, targetDir, fileName);
+                downloaded++;
+                logger.debug(`页面资源下载成功: ${fileName}`);
                 
-                await this.downloadFile(resourceUrl, targetDir, fileName);
-                return { url: resourceUrl, success: true, type: isGif ? 'gif' : 'image' };
+                // 更新进度 (页面资源下载占总进度的50%，从50%开始)
+                const progress = 50 + Math.round((downloaded / totalResources) * 50);
+                logger.progressBar('下载资源', progress, 100);
             } catch (error) {
-                logger.warn(`下载资源失败 ${resourceUrl}:`, (error as Error).message);
-                return { url: resourceUrl, success: false, error };
+                logger.error(`页面资源下载失败 ${fileName}:`, (error as Error).message);
+                downloaded++;
+                
+                // 即使失败也要更新进度
+                const progress = 50 + Math.round((downloaded / totalResources) * 50);
+                logger.progressBar('下载资源', progress, 100);
             }
-        });
+        }
 
-        const results = await Promise.allSettled(downloadPromises);
-        const successResults = results.filter((result): result is PromiseFulfilledResult<{url: string, success: true, type: string}> => 
-            result.status === 'fulfilled' && result.value.success
-        ).map(result => result.value);
-
-        const imageCount = successResults.filter(r => r.type === 'image').length;
-        const gifCount = successResults.filter(r => r.type === 'gif').length;
-
-        logger.success(`页面资源下载完成: ${imageCount} 张图片, ${gifCount} 个GIF`);
+        logger.debug(`页面资源下载完成: ${downloaded}/${resources.length} 成功`);
     }
 
     /**

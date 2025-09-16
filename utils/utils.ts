@@ -25,7 +25,9 @@ export async function retry<T>(fn: () => Promise<T>, maxRetries = CONFIG.maxRetr
         } catch (error) {
             lastError = error as Error;
             if (i < maxRetries - 1) {
-                console.warn(`重试 ${i + 1}/${maxRetries}: ${lastError.message}`);
+                if (process.env.DEBUG_MODE === 'true') {
+                    console.warn(`重试 ${i + 1}/${maxRetries}: ${lastError.message}`);
+                }
                 await delay(retryDelay);
             }
         }
@@ -213,12 +215,56 @@ export function isValidUrl(string: string): boolean {
 
 // 日志工具
 export const logger = {
-    info: (message: string, ...args: any[]) => console.log(`ℹ️ ${message}`, ...args),
-    success: (message: string, ...args: any[]) => console.log(`✅ ${message}`, ...args),
-    warn: (message: string, ...args: any[]) => console.warn(`⚠️ ${message}`, ...args),
-    error: (message: string, ...args: any[]) => console.error(`❌ ${message}`, ...args),
-    progress: (current: number, total: number, message: string = '') => {
+    // 调试信息，只在debug模式下显示
+    debug: (message: string, ...args: any[]) => {
+        if (process.env.DEBUG_MODE === 'true') {
+            console.log(`[DEBUG] ${message}`, ...args);
+        }
+    },
+    
+    // 错误信息，始终显示
+    error: (message: string, ...args: any[]) => {
+        console.error(`[ERROR] ${message}`, ...args);
+    },
+    
+    // 进度条，始终显示，在同一行更新
+    progressBar: (message: string, current: number, total: number) => {
         const percentage = Math.round((current / total) * 100);
-        console.log(`📊 进度: ${current}/${total} (${percentage}%) ${message}`);
+        const barLength = 20;
+        const filledLength = Math.round((barLength * current) / total);
+        const bar = '='.repeat(filledLength) + ' '.repeat(barLength - filledLength);
+        const output = `${message}: ${percentage}% [${bar}]`;
+        
+        // 清除当前行并输出新内容
+        process.stdout.write('\r' + output);
+        
+        // 如果完成了，换行
+        if (current >= total) {
+            process.stdout.write('\n');
+        }
+    },
+    
+    // 兼容性方法，保持向后兼容
+    info: (message: string, ...args: any[]) => {
+        if (process.env.DEBUG_MODE === 'true') {
+            console.log(`[INFO] ${message}`, ...args);
+        }
+    },
+    success: (message: string, ...args: any[]) => {
+        if (process.env.DEBUG_MODE === 'true') {
+            console.log(`[SUCCESS] ${message}`, ...args);
+        }
+    },
+    warn: (message: string, ...args: any[]) => {
+        if (process.env.DEBUG_MODE === 'true') {
+            console.warn(`[WARN] ${message}`, ...args);
+        }
+    },
+    progress: (current: number, total: number, message: string) => {
+        const percentage = Math.round((current / total) * 100);
+        const barLength = 20;
+        const filledLength = Math.round((barLength * current) / total);
+        const bar = '='.repeat(filledLength) + ' '.repeat(barLength - filledLength);
+        console.log(`${message}: ${percentage}% [${bar}]`);
     }
 };

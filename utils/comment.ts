@@ -23,24 +23,30 @@ export class ZanLiveComment {
      * 获取评论数据并完成所有处理
      */
     async fetchComments(pageData: PageData, outputDir: string): Promise<Comment[]> {
-        logger.info('开始获取评论数据...');
+        logger.debug('开始获取评论数据...');
+        logger.progressBar('获取评论数据', 0, 100);
 
         // 获取VOD评论数据
         if (pageData.vodCommentManifestUrl) {
+            logger.progressBar('获取评论数据', 10, 100);
             await this.fetchVodComments(pageData.vodCommentManifestUrl);
         }
 
         if (this.commentData.length === 0) {
             logger.warn('未获取到评论数据');
+            logger.progressBar('获取评论数据', 100, 100);
             return [];
         }
 
-        logger.success(`评论数据获取完成，共 ${this.commentData.length} 条`);
+        logger.debug(`评论数据获取完成，共 ${this.commentData.length} 条`);
+        logger.progressBar('获取评论数据', 50, 100);
 
         await this.processUserInfo();
+        logger.progressBar('获取评论数据', 90, 100);
         
         // 保存完整评论数据
         await this.saveEnriched(outputDir);
+        logger.progressBar('获取评论数据', 100, 100);
 
         return this.commentDataWithUser
     }
@@ -79,11 +85,14 @@ export class ZanLiveComment {
             if (!commentUrl) continue;
 
             const timeRange = commentsManifest[commentUrl];
-            if (!timeRange) continue;
+            if (!timeRange) {
+                logger.debug(`未找到时间范围信息: ${commentUrl}`);
+                continue;
+            }
 
             try {
-                logger.progress(i + 1, commentUrls.length, `获取评论片段: ${commentUrl}`);
-                logger.info(`时间范围: ${timeRange[0]} - ${timeRange[1]}`);
+                logger.debug(`获取评论片段: ${commentUrl}`);
+                logger.debug(`时间范围: ${timeRange[0]} - ${timeRange[1]}`);
 
                 const segmentResponse = await fetch(commentUrl, {
                     headers: createHeaders(this.token, this.url)
@@ -91,31 +100,33 @@ export class ZanLiveComment {
 
                 if (segmentResponse.ok) {
                     const segmentData = await segmentResponse.json();
-                    segmentData.forEach((comment: CommentOrigin) => {
-                        this.commentData.push(comment);
-                    });
+                    this.commentData.push(...segmentData.map((comment: CommentOrigin) => ({
+                        ...comment,
+                        timeRange
+                    })));
                 } else {
-                    logger.warn(`获取评论片段失败 (HTTP ${segmentResponse.status}): ${commentUrl}`);
+                    logger.debug(`获取评论片段失败 (HTTP ${segmentResponse.status}): ${commentUrl}`);
                 }
             } catch (e: unknown) {
                 const err = e as Error;
-                logger.warn(`获取评论片段失败: ${commentUrl}`, err.message);
+                logger.debug(`获取评论片段失败: ${commentUrl}`, err.message);
             }
 
-            // 添加小延迟避免请求过快
+            // 添加延迟避免请求过于频繁
             await delay(CONFIG.delays.commentSegment);
         }
     }
 
     /**
-     * 处理用户信息并保存完整评论数据
+     * 处理用户信息
      */
     async processUserInfo(){
-        logger.info('开始处理用户信息...');
+        logger.debug('开始处理用户信息...');
         
         // 提取唯一用户ID
         const userIds = [...new Set(this.commentData.map(comment => comment.user_id))];
-        logger.info(`发现 ${userIds.length} 个唯一用户`);
+        
+        logger.debug(`发现 ${userIds.length} 个唯一用户`);
         
         // 使用Map存储用户信息，提高查找效率
         const userInfoMap = new Map<string, userInfo>();
@@ -128,38 +139,39 @@ export class ZanLiveComment {
                     await delay(CONFIG.delays.userInfo);
                 }
                 
-                logger.progress(index + 1, userIds.length, `获取用户信息: ${userId}`);
+                logger.debug(`获取用户信息: ${userId}`);
+                
                 const userInfo = await this.fetchUserInfo(userId);
                 
                 if (userInfo) {
-                    userInfoMap.set(userId, {
-                        userName: userInfo.userName,
-                        profileImageUrl: userInfo.profileImageUrl
-                    });
+                    userInfoMap.set(userId, userInfo);
                 }
+                
+                // 更新进度 (从50%到90%，根据用户信息获取进度)
+                const progress = 50 + Math.round((index + 1) / userIds.length * 40);
+                logger.progressBar('获取评论数据', progress, 100);
                 
                 return { userId, success: true, userInfo };
             } catch (error) {
-                logger.warn(`获取用户信息失败: ${userId}`, (error as Error).message);
+                logger.debug(`获取用户信息失败: ${userId}`, (error as Error).message);
                 return { userId, success: false, error };
             }
         });
-        
-        // 等待所有用户信息获取完成
+
         const results = await Promise.allSettled(userInfoPromises);
         const successCount = results.filter(result => 
             result.status === 'fulfilled' && result.value.success
         ).length;
         
-        logger.info(`用户信息获取完成: ${successCount}/${userIds.length} 成功`);
+        logger.debug(`用户信息获取完成: ${successCount}/${userIds.length} 成功`);
         
         // 将评论数据与用户信息关联，生成完整的评论数据
         this.commentDataWithUser = this.commentData.map(comment => ({
             ...comment,
-            userInfo: userInfoMap.get(comment.user_id) || undefined
+            userInfo: userInfoMap.get(comment.user_id)
         }));
         
-        logger.success(`评论数据处理完成，共 ${this.commentDataWithUser.length} 条评论`);
+        logger.debug(`用户信息处理完成，共处理 ${this.commentDataWithUser.length} 条评论`);
     }
 
     /**
@@ -202,5 +214,14 @@ export class ZanLiveComment {
         return enrichedFilename;
     }
 
-
+    async saveCommentData(outputDir: string): Promise<void> {
+        try {
+            const commentsPath = join(outputDir, 'comments.json');
+            await Bun.write(commentsPath, JSON.stringify(this.commentDataWithUser, null, 2));
+            logger.debug(`评论数据已保存到: ${commentsPath}`);
+        } catch (error) {
+            logger.error('保存评论数据失败:', (error as Error).message);
+            throw error;
+        }
+    }
 }
