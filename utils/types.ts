@@ -54,37 +54,9 @@ export interface userInfo{
     profileImageUrl?: string;
 }
 
-export interface CommentData {
-    timestamp: string;
-    source: string;
-    segment?: string;
-    timeRange?: [string, string]; // 实际数据中是字符串格式的时间戳
-    data: Comment;
-}
-
-
 export interface PageData {
     commentWsUrl?: string;
     commentPull?: string;
     vodCommentManifestUrl?: string;
     apiEndpointUrl?: string;
-}
-
-export interface EnrichedComment extends Comment {
-    user: UserInfo;
-    enriched: boolean;
-    avatarPath?: string;
-    timestamp?: number; // 添加timestamp字段用于ASS生成
-    message?: string; // 添加message字段用于ASS生成
-}
-
-
-
-export interface AssConfig {
-    videoWidth: number;
-    videoHeight: number;
-    fontSize: number;
-    speed: number;
-    lineHeight: number;
-    maxLines: number;
 }

@@ -5,6 +5,7 @@ import { logger } from './utils/utils.js';
 import { ensureDir } from './utils/utils.js';
 import {ZanLiveComment} from "./utils/comment.ts";
 import { ResourceDownloader } from './utils/resource-downloader.js';
+import { AssGenerator } from './utils/ass-generator.js';
 const program = new Command();
 
 program
@@ -16,12 +17,14 @@ program
     .option('-o, --output <dir>', '输出目录（默认使用直播名称）')
     .option('--no-comments', '跳过评论下载')
     .option('--no-resources', '跳过资源下载')
+    .option('--no-ass', '跳过ASS弹幕生成')
     .parse();
 
 const options = program.opts();
 
 async function main() {
     const { token, url, output, comments, resources } = options;
+    const ass = options.ass !== false; // 默认生成ASS，除非明确指定--no-ass
     console.log(options)
     if (!token || !url) {
         logger.error('Token 和 URL 参数不能为空');
@@ -71,6 +74,18 @@ async function main() {
             logger.info('跳过资源下载（--no-resources）');
         } else {
             logger.warn('没有评论数据，跳过资源下载');
+        }
+        
+        // 4. 生成ASS弹幕文件
+        if (ass && commentData && commentData.length > 0) {
+            logger.info('步骤 4: 生成ASS弹幕文件');
+            const assGenerator = new AssGenerator(pageData.liveId, pageData.liveName);
+            const assFilePath = await assGenerator.saveAss(commentData, outputDir);
+            logger.success(`ASS弹幕文件已生成: ${assFilePath}`);
+        } else if (!ass) {
+            logger.info('跳过ASS弹幕生成（--no-ass）');
+        } else {
+            logger.warn('没有评论数据，跳过ASS弹幕生成');
         }
         
         logger.success('\n✅ 所有任务完成！');

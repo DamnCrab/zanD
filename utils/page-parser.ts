@@ -6,6 +6,7 @@ import { createHeaders, logger } from './utils.js';
 export interface ParsedPageData extends PageData {
     liveId: string;
     liveName: string;
+    liveUrl?: string;
     resourceUrls: string[];
 }
 
@@ -51,6 +52,7 @@ export class PageParser {
         // 获取基本信息
         const liveId = $('meta[name="live-id"]').attr('content');
         const liveName = $('meta[name="live-name"]').attr('content');
+        const liveUrl = $('meta[name="live-url"]').attr('content');
         
         if (!liveId) {
             throw new Error('未找到有效的直播ID，请确认URL是否正确');
@@ -60,6 +62,9 @@ export class PageParser {
         const safeLiveName = liveName || '直播';
         
         logger.info(`检测到直播: ${safeLiveName} (ID: ${liveId})`);
+        if (liveUrl) {
+            logger.info(`直播URL: ${liveUrl}`);
+        }
 
         // 解析礼物数据
         this.parseGiftData($, resourceUrls);
@@ -75,6 +80,7 @@ export class PageParser {
         return {
             liveId,
             liveName: safeLiveName,
+            liveUrl,
             resourceUrls,
             commentWsUrl: $('meta[name="comment-ws-url"]').attr('content') || undefined,
             commentPull: $('meta[name="comment-pull"]').attr('content') || undefined,
