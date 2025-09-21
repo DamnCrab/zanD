@@ -173,6 +173,7 @@ export function mergeUserInfoToComments(commentData: Comment[], userInfoMap: Map
  * 创建HTTP请求头
  * @param token 认证token
  * @param url 请求URL
+ * @param sessionId
  * @returns HTTP请求头对象
  */
 export function createHeaders(token: string, url: string, sessionId?: string): Record<string, string> {
@@ -204,6 +205,7 @@ export function createHeaders(token: string, url: string, sessionId?: string): R
  * 创建JSON请求头
  * @param token 认证token
  * @param url 请求URL
+ * @param sessionId
  * @returns JSON请求头对象
  */
 export function createJsonHeaders(token: string, url: string, sessionId?: string): Record<string, string> {

@@ -1,7 +1,7 @@
 // 页面解析模块 - 处理页面数据解析逻辑
 import * as cheerio from 'cheerio';
-import { PageData } from './types.js';
-import { createHeaders, logger } from './utils.js';
+import {PageData} from './types.js';
+import {createHeaders, logger} from './utils.js';
 
 export interface ParsedPageData extends PageData {
     liveId: string;
@@ -36,8 +36,7 @@ export class PageParser {
                 throw new Error(`HTTP ${response.status}: ${response.statusText}`);
             }
 
-            const html = await response.text();
-            return html;
+            return await response.text();
         } catch (error) {
             logger.error('获取页面失败:', (error as Error).message);
             throw error;

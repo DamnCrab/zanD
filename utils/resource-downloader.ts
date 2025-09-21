@@ -15,7 +15,7 @@ interface ParsedPageData {
     apiEndpointUrl?: string;
 }
 import { CONFIG } from './config.js';
-import { createHeaders, delay, ensureDir, logger } from './utils.js';
+import { createHeaders, ensureDir, logger } from './utils.js';
 
 export interface ResourceInfo {
     url: string;

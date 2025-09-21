@@ -1,12 +1,12 @@
 #!/usr/bin/env bun
-import { Command } from 'commander';
-import { PageParser } from './utils/page-parser.js';
-import { ZanLiveComment } from './utils/comment.js';
-import { AssGenerator } from './utils/ass-generator.js';
-import { ResourceDownloader } from './utils/resource-downloader.js';
-import { M3U8StreamDownloader } from './utils/m3u8-downloader.js';
-import { ZanLiveAuth } from './utils/auth.js';
-import { logger, ensureDir } from './utils/utils.js';
+import {Command} from 'commander';
+import {PageParser} from './utils/page-parser.js';
+import {ZanLiveComment} from './utils/comment.js';
+import {AssGenerator} from './utils/ass-generator.js';
+import {ResourceDownloader} from './utils/resource-downloader.js';
+import {M3U8StreamDownloader} from './utils/m3u8-downloader.js';
+import {ZanLiveAuth} from './utils/auth.js';
+import {logger, ensureDir} from './utils/utils.js';
 
 const program = new Command();
 
@@ -33,8 +33,7 @@ if (options.debug) {
 }
 
 async function main() {
-    console.log(options)
-    const { token, url, sessionId, output, resources, email, password } = options;
+    const {token, url, sessionId, output, resources, email, password} = options;
 
     // 检查参数
     if (!url) {
@@ -46,35 +45,34 @@ async function main() {
     let authSessionId = sessionId;
 
     // 如果提供了邮箱和密码，则使用登录模式
-  if (email && password) {
-    logger.info('使用邮箱密码登录模式...');
-    const auth = new ZanLiveAuth();
-    const loginResult = await auth.login({ 
-      mailAddress: email, 
-      password: password,
-      isPersistentLogin: true 
-    });
-    
-    if (!loginResult.success) {
-      logger.error(`登录失败: ${loginResult.error}`);
-      process.exit(1);
+    if (email && password) {
+        logger.info('使用邮箱密码登录模式...');
+        const auth = new ZanLiveAuth();
+        const loginResult = await auth.login({
+            mailAddress: email,
+            password: password,
+            isPersistentLogin: true
+        });
+
+        if (!loginResult.success) {
+            logger.error(`登录失败: ${loginResult.error}`);
+            process.exit(1);
+        }
+
+        authToken = loginResult.token;
+        authSessionId = loginResult.sessionId;
+        logger.info('登录成功，获取到认证信息');
+    } else if (!token) {
+        logger.error('需要提供 token 参数或邮箱密码');
+        process.exit(1);
     }
-    console.log('登录成功，获取到认证信息', loginResult);
-    
-    authToken = loginResult.token;
-    authSessionId = loginResult.sessionId;
-    logger.info('登录成功，获取到认证信息');
-  } else if (!token) {
-    logger.error('需要提供 token 参数或邮箱密码');
-    process.exit(1);
-  }
 
     try {
         // 1. 解析页面数据
         logger.debug('步骤 1: 解析页面数据');
         // 使用获取到的认证信息
-    const pageParser = new PageParser(authToken, url, authSessionId);
-    const pageData = await pageParser.fetchAndParsePage();
+        const pageParser = new PageParser(authToken, url, authSessionId);
+        const pageData = await pageParser.fetchAndParsePage();
 
         if (!pageData.liveId || !pageData.liveName) {
             throw new Error('无法获取直播ID或直播名称');
@@ -82,19 +80,18 @@ async function main() {
 
         // 只显示直播信息
         console.log(`直播: ${pageData.liveName} (ID: ${pageData.liveId})`);
-        
+
         // 创建输出目录
         const outputDir = output || pageData.liveName.replace(/[<>:"/\\|?*]/g, '_');
         await ensureDir(outputDir);
 
         // 2. 获取评论数据并处理用户信息
-        let commentData
         if (resources) {
             const commentProcessor = new ZanLiveComment(token, url, pageData.liveId, pageData.liveName, sessionId);
-    const commentData = await commentProcessor.fetchComments(pageData, outputDir);
+            const commentData = await commentProcessor.fetchComments(pageData, outputDir);
 
-    // 步骤 3: 下载资源
-    const resourceDownloader = new ResourceDownloader(token, url, outputDir, sessionId);
+            // 步骤 3: 下载资源
+            const resourceDownloader = new ResourceDownloader(token, url, outputDir, sessionId);
             await resourceDownloader.downloadAllResources(commentData, pageData);
 
             // 4. 生成ASS弹幕文件
@@ -106,7 +103,7 @@ async function main() {
         // 5. 下载M3U8流
         logger.progressBar('M3U8下载', 0, 100);
         const m3u8Downloader = new M3U8StreamDownloader(outputDir);
-        
+
         try {
             if (pageData.liveUrl) {
                 const streamIndex = parseInt(options.streamIndex, 10);
@@ -117,9 +114,9 @@ async function main() {
                     streamIndex: streamIndex,
                     refererUrl: options.url,
                     token: authToken,
-                    sessionId: authSessionId || 's%3AVrATopwDJZ3VC4tSXJ9h4dr75C7TkVxb.DKPp%2BgbVYMuKjQidMhmyvPUr68OHZPphTREG9XJEtqM'
+                    sessionId: authSessionId
                 });
-                
+
                 if (downloadResult) {
                     logger.progressBar('M3U8下载', 100, 100);
                     logger.debug('M3U8流下载完成');
@@ -133,9 +130,9 @@ async function main() {
             logger.error('M3U8流下载失败');
             logger.debug('错误详情:', (error as Error).message);
         }
-        
+
         logger.debug('所有任务完成！');
-        
+
     } catch (error) {
         logger.error('处理失败:', (error as Error).message);
         logger.debug('详细错误信息:', error);
