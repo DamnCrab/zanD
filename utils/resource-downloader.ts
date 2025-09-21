@@ -27,11 +27,13 @@ export class ResourceDownloader {
     private token: string;
     private url: string;
     private outputDir: string;
+    private sessionId?: string;
 
-    constructor(token: string, url: string, outputDir: string) {
+    constructor(token: string, url: string, outputDir: string, sessionId?: string) {
         this.token = token;
         this.url = url;
         this.outputDir = outputDir;
+        this.sessionId = sessionId;
     }
 
     /**
@@ -160,7 +162,7 @@ export class ResourceDownloader {
         
         try {
             const response = await fetch(url, {
-                headers: createHeaders(this.token, this.url)
+                headers: createHeaders(this.token, this.url, this.sessionId)
             });
 
             if (!response.ok) {

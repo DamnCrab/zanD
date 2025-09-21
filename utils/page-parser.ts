@@ -13,10 +13,12 @@ export interface ParsedPageData extends PageData {
 export class PageParser {
     private token: string;
     private url: string;
+    private sessionId?: string;
 
-    constructor(token: string, url: string) {
+    constructor(token: string, url: string, sessionId?: string) {
         this.token = token;
         this.url = url;
+        this.sessionId = sessionId;
     }
 
     /**
@@ -27,7 +29,7 @@ export class PageParser {
         
         try {
             const response = await fetch(this.url, {
-                headers: createHeaders(this.token, this.url)
+                headers: createHeaders(this.token, this.url, this.sessionId)
             });
 
             if (!response.ok) {
@@ -55,6 +57,7 @@ export class PageParser {
         const liveUrl = $('meta[name="live-url"]').attr('content');
         
         if (!liveId) {
+            console.log(html)
             throw new Error('未找到有效的直播ID，请确认URL是否正确');
         }
 

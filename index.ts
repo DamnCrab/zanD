@@ -5,6 +5,7 @@ import { ZanLiveComment } from './utils/comment.js';
 import { AssGenerator } from './utils/ass-generator.js';
 import { ResourceDownloader } from './utils/resource-downloader.js';
 import { M3U8StreamDownloader } from './utils/m3u8-downloader.js';
+import { ZanLiveAuth } from './utils/auth.js';
 import { logger, ensureDir } from './utils/utils.js';
 
 const program = new Command();
@@ -16,6 +17,8 @@ program
     .option('-t, --token <token>', 'API访问令牌')
     .option('-u, --url <url>', '直播页面URL')
     .option('-s, --session-id <sessionId>', '会话ID (Z-aN_sid Cookie)')
+    .option('-e, --email <email>', '登录邮箱')
+    .option('-p, --password <password>', '登录密码')
     .option('-o, --output <dir>', '输出目录（默认使用直播名）')
     .option('--no-resources', '跳过评论、资源下载和ASS弹幕生成，仅下载M3U8流')
     .option('--stream-index <index>', '指定下载第几条M3U8流（默认0，即第一条）', '0')
@@ -30,18 +33,48 @@ if (options.debug) {
 }
 
 async function main() {
-    const { token, url, sessionId, output, resources } = options;
+    console.log(options)
+    const { token, url, sessionId, output, resources, email, password } = options;
 
-    if (!token || !url) {
-        logger.error('需要提供 token 和 url 参数');
+    // 检查参数
+    if (!url) {
+        logger.error('需要提供 url 参数');
         process.exit(1);
     }
+
+    let authToken = token;
+    let authSessionId = sessionId;
+
+    // 如果提供了邮箱和密码，则使用登录模式
+  if (email && password) {
+    logger.info('使用邮箱密码登录模式...');
+    const auth = new ZanLiveAuth();
+    const loginResult = await auth.login({ 
+      mailAddress: email, 
+      password: password,
+      isPersistentLogin: true 
+    });
+    
+    if (!loginResult.success) {
+      logger.error(`登录失败: ${loginResult.error}`);
+      process.exit(1);
+    }
+    console.log('登录成功，获取到认证信息', loginResult);
+    
+    authToken = loginResult.token;
+    authSessionId = loginResult.sessionId;
+    logger.info('登录成功，获取到认证信息');
+  } else if (!token) {
+    logger.error('需要提供 token 参数或邮箱密码');
+    process.exit(1);
+  }
 
     try {
         // 1. 解析页面数据
         logger.debug('步骤 1: 解析页面数据');
-        const pageParser = new PageParser(token, url);
-        const pageData = await pageParser.fetchAndParsePage();
+        // 使用获取到的认证信息
+    const pageParser = new PageParser(authToken, url, authSessionId);
+    const pageData = await pageParser.fetchAndParsePage();
 
         if (!pageData.liveId || !pageData.liveName) {
             throw new Error('无法获取直播ID或直播名称');
@@ -57,11 +90,11 @@ async function main() {
         // 2. 获取评论数据并处理用户信息
         let commentData
         if (resources) {
-            const commentProcessor = new ZanLiveComment(token, url, pageData.liveId, pageData.liveName);
-            commentData = await commentProcessor.fetchComments(pageData, outputDir);
+            const commentProcessor = new ZanLiveComment(token, url, pageData.liveId, pageData.liveName, sessionId);
+    const commentData = await commentProcessor.fetchComments(pageData, outputDir);
 
-            // 3. 下载资源
-            const resourceDownloader = new ResourceDownloader(token, url, outputDir);
+    // 步骤 3: 下载资源
+    const resourceDownloader = new ResourceDownloader(token, url, outputDir, sessionId);
             await resourceDownloader.downloadAllResources(commentData, pageData);
 
             // 4. 生成ASS弹幕文件
@@ -83,8 +116,8 @@ async function main() {
                     filename: pageData.liveName,
                     streamIndex: streamIndex,
                     refererUrl: options.url,
-                    token: options.token,
-                    sessionId: options.sessionId || 's%3AVrATopwDJZ3VC4tSXJ9h4dr75C7TkVxb.DKPp%2BgbVYMuKjQidMhmyvPUr68OHZPphTREG9XJEtqM'
+                    token: authToken,
+                    sessionId: authSessionId || 's%3AVrATopwDJZ3VC4tSXJ9h4dr75C7TkVxb.DKPp%2BgbVYMuKjQidMhmyvPUr68OHZPphTREG9XJEtqM'
                 });
                 
                 if (downloadResult) {

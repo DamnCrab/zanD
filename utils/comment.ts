@@ -9,14 +9,16 @@ export class ZanLiveComment {
     private url: string;
     private liveId: string;
     private liveName: string;
+    private sessionId?: string;
     private commentData: CommentOrigin[] = [];
     private commentDataWithUser: Comment[] = [];
 
-    constructor(token: string, url: string, liveId: string, liveName: string) {
+    constructor(token: string, url: string, liveId: string, liveName: string, sessionId?: string) {
         this.token = token;
         this.url = url;
         this.liveId = liveId;
         this.liveName = liveName;
+        this.sessionId = sessionId;
     }
 
     /**
@@ -59,7 +61,7 @@ export class ZanLiveComment {
             logger.info('获取VOD评论清单:', manifestUrl);
 
             const response = await fetch(manifestUrl, {
-                headers: createHeaders(this.token, this.url)
+                headers: createHeaders(this.token, this.url, this.sessionId)
             });
 
             if (response.ok) {
@@ -95,7 +97,7 @@ export class ZanLiveComment {
                 logger.debug(`时间范围: ${timeRange[0]} - ${timeRange[1]}`);
 
                 const segmentResponse = await fetch(commentUrl, {
-                    headers: createHeaders(this.token, this.url)
+                    headers: createHeaders(this.token, this.url, this.sessionId)
                 });
 
                 if (segmentResponse.ok) {

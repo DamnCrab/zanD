@@ -1,5 +1,3 @@
-import fs from 'fs';
-import path from 'path';
 import { UserInfo, Comment } from './types.js';
 
 // 工具函数模块 - 通用工具函数
@@ -177,16 +175,28 @@ export function mergeUserInfoToComments(commentData: Comment[], userInfoMap: Map
  * @param url 请求URL
  * @returns HTTP请求头对象
  */
-export function createHeaders(token: string, url: string): Record<string, string> {
+export function createHeaders(token: string, url: string, sessionId?: string): Record<string, string> {
+    // 构建Cookie字符串
+    let cookieValue = `nglives_pltk=${token}`;
+    if (sessionId) {
+        cookieValue += `; Z-aN_sid=${sessionId}`;
+    }
+    
     return {
-        'User-Agent': CONFIG.userAgent,
-        'Cookie': `nglives_pltk=${token}`,
+        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:142.0) Gecko/20100101 Firefox/142.0',
+        'Cookie': cookieValue,
         'Referer': url,
-        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
-        'Accept-Language': 'zh-CN,zh;q=0.9,en;q=0.8',
-        'Accept-Encoding': 'gzip, deflate, br',
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+        'Accept-Language': 'zh-CN,zh;q=0.8,zh-TW;q=0.7,zh-HK;q=0.5,en-US;q=0.3,en;q=0.2',
+        'Accept-Encoding': 'gzip, deflate, br, zstd',
         'Connection': 'keep-alive',
-        'Upgrade-Insecure-Requests': '1'
+        'Upgrade-Insecure-Requests': '1',
+        'Sec-GPC': '1',
+        'Sec-Fetch-Dest': 'document',
+        'Sec-Fetch-Mode': 'navigate',
+        'Sec-Fetch-Site': 'same-origin',
+        'Sec-Fetch-User': '?1',
+        'Priority': 'u=0, i'
     };
 }
 
@@ -196,9 +206,9 @@ export function createHeaders(token: string, url: string): Record<string, string
  * @param url 请求URL
  * @returns JSON请求头对象
  */
-export function createJsonHeaders(token: string, url: string): Record<string, string> {
+export function createJsonHeaders(token: string, url: string, sessionId?: string): Record<string, string> {
     return {
-        ...createHeaders(token, url),
+        ...createHeaders(token, url, sessionId),
         'Accept': 'application/json'
     };
 }
